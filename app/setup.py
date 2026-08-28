@@ -24,18 +24,15 @@ except ImportError:
                  "   pip install customtkinter")
     sys.exit(1)
 
-DEFAULT_PROMPT = ("You are solving on-screen math/logic tasks in a game. "
-                  "Read the task(s) in the screenshot and reply with ONLY the numeric "
-                  "answer(s), nothing else - no words, no explanation. If there are "
-                  "several tasks, separate the numbers with spaces.")
-MODEL_HINT = {"gemini": "gemini-2.5-flash-lite", "openai": "gpt-4o-mini"}
+DEFAULT_PROMPT = ""      # extra notes are empty by default (built-in prompt is used)
+MODEL_HINT = {"gemini": "gemini-3.5-flash-lite", "openai": "gpt-4o-mini"}
 
 # One-click presets. gemini uses the native API (no base_url); the rest are all
 # OpenAI-compatible — same code path, just a different base_url. Model ids are
 # suggestions; edit the Model field if a provider renames them.
 # (provider, base_url, suggested_model)
 PRESETS = {
-    "Gemini (free)":  ("gemini", "", "gemini-2.5-flash-lite"),
+    "Gemini (free)":  ("gemini", "", "gemini-3.5-flash-lite"),
     "Ollama (local)": ("openai", "http://localhost:11434/v1", "qwen2.5vl:7b"),
     "OpenAI":         ("openai", "https://api.openai.com/v1", "gpt-4o-mini"),
     "NVIDIA NIM (free)": ("openai", "https://integrate.api.nvidia.com/v1",
@@ -234,13 +231,17 @@ quit_entry.pack(side="left", padx=10)
 quit_entry.insert(0, s.get("quit_hotkey", "f8"))
 
 # --- prompt -----------------------------------------------------------------
-c3 = card("Prompt sent with the screenshot")
-prompt_box = ctk.CTkTextbox(c3, height=110, wrap="word")
+c3 = card("Extra instructions (added to the built-in prompt)")
+ctk.CTkLabel(c3, wraplength=520, justify="left", text_color="#6a7088",
+             font=("Segoe UI", 11),
+             text="Optional. Appended to the built-in prompt in BOTH modes — use it "
+                  "for tweaks like 'ignore the killfeed on the right'. Leave empty to "
+                  "use the built-in prompt as-is.").pack(anchor="w", padx=16, pady=(0, 4))
+prompt_box = ctk.CTkTextbox(c3, height=80, wrap="word")
 prompt_box.pack(fill="x", padx=16, pady=(2, 6))
 prompt_box.insert("1.0", s.get("prompt", DEFAULT_PROMPT))
-ctk.CTkButton(c3, text="Reset to default", width=140, fg_color="#3a3f55",
-              command=lambda: (prompt_box.delete("1.0", "end"),
-                               prompt_box.insert("1.0", DEFAULT_PROMPT))
+ctk.CTkButton(c3, text="Clear", width=140, fg_color="#3a3f55",
+              command=lambda: prompt_box.delete("1.0", "end")
               ).pack(anchor="e", padx=16, pady=(0, 12))
 
 # --- advanced ---------------------------------------------------------------

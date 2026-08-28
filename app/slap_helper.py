@@ -60,17 +60,21 @@ DEFAULTS = {
     "quit_hotkey": "f8",
     "region": "full",                  # "full" | "right" | "left" screen crop
     "local_math": True,                # let the AI READ, but compute arithmetic in Python
-    "prompt": ("This is a Slap Battles 'bunker code' board with several task panels; "
-               "each panel's answer is a SINGLE digit (0-9). IGNORE the game HUD/stats "
-               "at the top and edges (ping, FPS, CPU, players, chat). Solve each panel "
-               "top to bottom and reply with ONLY the digits separated by spaces (one "
-               "digit per task), nothing else - e.g. '4 3 6 2'. Never output a "
-               "multi-digit number for a single task."),
+    "prompt": "",                      # EXTRA instructions, appended to the built-in prompt
     "overlay_seconds": 6,
     "jpeg_quality": 70,
     "max_width": 1280,                 # downscale before upload for speed (0 = off)
 }
-MODEL_DEFAULTS = {"gemini": "gemini-2.5-flash-lite", "openai": "gpt-4o-mini"}
+MODEL_DEFAULTS = {"gemini": "gemini-3.5-flash-lite", "openai": "gpt-4o-mini"}
+
+# Prompt for the non-local mode: the model reads AND solves, replies with digits.
+PLAIN_PROMPT = (
+    "This is a Slap Battles 'bunker code' board with several task panels; each panel's "
+    "answer is a SINGLE digit (0-9). IGNORE the game HUD/stats at the top and edges "
+    "(ping, FPS, CPU, players, chat). Solve each panel top to bottom and reply with "
+    "ONLY the digits separated by spaces (one digit per task), nothing else - e.g. "
+    "'4 3 6 2'. Never output a multi-digit number for a single task."
+)
 
 # Prompt used in local-math mode: the model only READS (its strong side); every
 # arithmetic line is then recomputed in Python (100% accurate — the model's weak side).
@@ -394,7 +398,9 @@ def _work(s):
     try:
         who = _who(s)
         local_math = s.get("local_math", True)
-        prompt = STRUCT_PROMPT if local_math else s["prompt"]
+        base = STRUCT_PROMPT if local_math else PLAIN_PROMPT
+        extra = (s.get("prompt") or "").strip()        # user's extra notes from setup
+        prompt = base + ("\n\n" + extra if extra else "")
         overlay.show(f"\U0001F4F8  Sent to {who}…", SENT_COLOR, 0, 22)
         t0 = time.time()
         jpeg = grab_jpeg(s["max_width"], s["jpeg_quality"],
