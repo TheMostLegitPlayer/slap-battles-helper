@@ -60,10 +60,12 @@ DEFAULTS = {
     "quit_hotkey": "f8",
     "region": "full",                  # "full" | "right" | "left" screen crop
     "local_math": True,                # let the AI READ, but compute arithmetic in Python
-    "prompt": ("You are solving on-screen math/logic tasks in a game. "
-               "Read the task(s) in the screenshot and reply with ONLY the numeric "
-               "answer(s), nothing else - no words, no explanation. If there are "
-               "several tasks, separate the numbers with spaces."),
+    "prompt": ("This is a Slap Battles 'bunker code' board with several task panels; "
+               "each panel's answer is a SINGLE digit (0-9). IGNORE the game HUD/stats "
+               "at the top and edges (ping, FPS, CPU, players, chat). Solve each panel "
+               "top to bottom and reply with ONLY the digits separated by spaces (one "
+               "digit per task), nothing else - e.g. '4 3 6 2'. Never output a "
+               "multi-digit number for a single task."),
     "overlay_seconds": 6,
     "jpeg_quality": 70,
     "max_width": 1280,                 # downscale before upload for speed (0 = off)
@@ -73,10 +75,12 @@ MODEL_DEFAULTS = {"gemini": "gemini-2.5-flash-lite", "openai": "gpt-4o-mini"}
 # Prompt used in local-math mode: the model only READS (its strong side); every
 # arithmetic line is then recomputed in Python (100% accurate — the model's weak side).
 STRUCT_PROMPT = (
-    "Each panel on this screen is one task, top to bottom. For EACH panel output ONE "
-    "line: the task copied verbatim (join any wrapped text into a single line, keep "
-    "math symbols like ^ x ÷ and parentheses), then ' ||| ', then your numeric "
-    "answer. Output nothing else."
+    "This is a Slap Battles 'bunker code' board: several task panels, and each "
+    "panel's answer is a SINGLE digit (0-9). IGNORE the game HUD and any stats at the "
+    "top or edges of the screen (ping, FPS, CPU, player list, chat, timers). "
+    "For EACH task panel, top to bottom, output ONE line: the task copied verbatim "
+    "(join any wrapped text into a single line, keep math symbols like ^ x ÷ and "
+    "parentheses), then ' ||| ', then its single-digit answer. Output nothing else."
 )
 
 # Known task pool for Slap Battles "bunker codes": the game shows a random subset of
@@ -154,6 +158,15 @@ def evaluate(expr):
 def _is_arith(s):
     return bool(re.search(r"\d", s)) and re.fullmatch(
         r"[\d\s\+\-\*/×÷xX\^\(\)\.,=]+", s.strip()) is not None
+
+
+def format_code(ans):
+    """When every task resolved to a single digit, also show the joined code so it's
+    unambiguous, e.g. '4 3 6 2   ->   4362'."""
+    parts = ans.split()
+    if len(parts) > 1 and all(len(p) == 1 and p.isdigit() for p in parts):
+        return f"{' '.join(parts)}   →   {''.join(parts)}"
+    return ans
 
 
 def parse_structured(raw):
@@ -396,6 +409,7 @@ def _work(s):
             print(f"[{who} raw] {ans.strip()}")
             ans = parse_structured(ans)
         ans = ans.strip() or "(empty answer)"
+        ans = format_code(ans)
         print(f"[{who} {dt:.1f}s] {ans}")
         # big answer, highlighted the same way the sent box was
         size = 40 if len(ans) <= 24 else 26
