@@ -315,6 +315,27 @@ def grab_jpeg(max_width, quality, max_b64=MAX_B64, region="full"):
 
 
 # ---------------------------------------------------------------- LLM calls
+def _post_retry(url, *, json_body, headers=None, timeout=60, retries=3, label=""):
+    """POST that retries on timeouts, connection errors and transient server
+    errors (429/500/502/503/504) with a short backoff, instead of failing at once."""
+    last = None
+    for attempt in range(retries):
+        try:
+            r = requests.post(url, json=json_body, headers=headers, timeout=timeout)
+        except requests.exceptions.RequestException as e:
+            last = RuntimeError(f"{label} network error: {e}")
+        else:
+            if r.status_code == 200:
+                return r
+            if r.status_code not in (429, 500, 502, 503, 504):
+                raise RuntimeError(f"{label} {r.status_code}: {r.text[:200]}")
+            last = RuntimeError(f"{label} {r.status_code}: {r.text[:120]}")
+        if attempt < retries - 1:
+            print(f"[retry {attempt+1}/{retries-1}] {last}", flush=True)
+            time.sleep(1.5 * (attempt + 1))
+    raise last or RuntimeError(f"{label} request failed")
+
+
 def ask_gemini(key, model, prompt, jpeg):
     b64 = base64.b64encode(jpeg).decode()
     url = (f"https://generativelanguage.googleapis.com/v1beta/models/"
@@ -326,9 +347,7 @@ def ask_gemini(key, model, prompt, jpeg):
         ]}],
         "generationConfig": {"temperature": 0},
     }
-    r = requests.post(url, json=body, timeout=60)
-    if r.status_code != 200:
-        raise RuntimeError(f"Gemini {r.status_code}: {r.text[:200]}")
+    r = _post_retry(url, json_body=body, label="Gemini")
     data = r.json()
     return data["candidates"][0]["content"]["parts"][0]["text"].strip()
 
@@ -347,10 +366,8 @@ def ask_openai(key, model, prompt, jpeg, base_url=""):
              "image_url": {"url": f"data:image/jpeg;base64,{b64}"}},
         ]}],
     }
-    r = requests.post(f"{base}/chat/completions", json=body,
-                      headers={"Authorization": f"Bearer {key}"}, timeout=60)
-    if r.status_code != 200:
-        raise RuntimeError(f"{r.status_code}: {r.text[:200]}")
+    r = _post_retry(f"{base}/chat/completions", json_body=body,
+                    headers={"Authorization": f"Bearer {key}"})
     return r.json()["choices"][0]["message"]["content"].strip()
 
 
